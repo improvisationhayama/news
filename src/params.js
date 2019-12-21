@@ -1,0 +1,1 @@
+exports.ACCEPTS_LANGUAGES = ['vi', 'en'];

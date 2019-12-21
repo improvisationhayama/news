@@ -1,0 +1,175 @@
+#!/usr/bin/env node
+
+/**
+ * Module dependencies.
+ */
+require('dotenv').config({path: './.env'});
+const app = require('../app');
+const authenticator = require('../src/middlewares/authenticator');
+const schema = require('../src/models/schema');
+const debug = require('debug')('demo:server');
+const http = require('http');
+const {createLogger, format, transports} = require('winston');
+const { combine, timestamp, printf } = format;
+const Sequelize = require('sequelize');
+
+const DB_HOST = process.env.DB_HOST;
+const DB_USERNAME = process.env.DB_USERNAME;
+const DB_PASSWORD = process.env.DB_PASSWORD;
+const DB_NAME = process.env.DB_NAME;
+const MAX_RETRY = process.env.MAX_RETRY;
+const RETRY_INTERVAL = process.env.RETRY_INTERVAL;
+
+// Configurate logger
+
+const logFormat = printf(({ level, message, timestamp }) => {
+    return `${timestamp} ${level}: ${message}`;
+});
+
+const logger = createLogger({
+    format: combine(
+        timestamp({format: 'HH:mm:ss dddd DD/MM/YYYY'}),
+        logFormat
+    ),
+    transports: [
+        new transports.File({filename: 'logs/error.log', level: 'error'}),
+        new transports.File({filename: 'logs/debug.log'}),
+    ]
+});
+
+if (process.env.NODE_ENV === 'dev') {
+    logger.add(new transports.Console({stderrLevels: ['error', 'info']}));
+}
+
+/**
+ * Get port from environment and store in Express.
+ */
+
+let port = normalizePort(process.env.PORT || '3000');
+app.set('port', port);
+
+/**
+ * Create HTTP server.
+ */
+
+let server = http.createServer(app);
+
+const defineSchema = (schema) => {
+    Object.keys(schema).forEach(key => {
+        sequelize.define(key, schema[key], {});
+    });
+};
+
+// Initialize sequelize object
+const sequelize = new Sequelize(DB_NAME, DB_USERNAME, DB_PASSWORD, {
+    host: DB_HOST,
+    dialect: 'mysql',
+    define: {
+        freezeTableName: false
+    }
+});
+
+// Check sequelize connection
+let retryCount = 0;
+const connectWithRetry = () => {
+    if (retryCount > MAX_RETRY) {
+        logger.info('Exceed maximum retry attemps');
+        return false;
+    }
+
+    sequelize
+        .authenticate()
+        .then(() => {
+            logger.info('Connection has been established successfully.');
+
+            // Define schema
+            defineSchema(schema);
+
+            // Sync schema
+            return sequelize.sync({alter: true}).then(() => {  
+                return authenticator.getEnforcer().then((enforcer) => {
+                // Set global variables
+                    global.sequelize = sequelize;
+                    global.logger = logger;
+                    global.enforcer = enforcer;
+                
+                    server.listen(port, () => logger.info(`News service is running on port ${port}`));
+                    server.on('error', onError);
+                    server.on('listening', onListening);
+                });
+            });
+        })
+        .catch((error) => {
+            logger.error('Unable to connect to the database');
+            logger.error(error);
+            logger.info(`Retry after ${RETRY_INTERVAL} seconds`);
+            retryCount += 1;
+            setTimeout(connectWithRetry, RETRY_INTERVAL);
+        });
+};
+
+connectWithRetry();
+
+/**
+ * Normalize a port into a number, string, or false.
+ */
+
+ 
+
+function normalizePort(val) {
+    let port = parseInt(val, 10);
+
+    if (isNaN(port)) {
+    // named pipe
+        return val;
+    }
+
+    if (port >= 0) {
+    // port number
+        return port;
+    }
+
+    return false;
+}
+
+/**
+ * Event listener for HTTP server "error" event.
+ */
+
+function onError(error) {
+    if (error.syscall !== 'listen') {
+        throw error;
+    }
+
+    // let bind = typeof port === 'string'
+    //     ? 'Pipe ' + port
+    //     : 'Port ' + port;
+
+    // handle specific listen errors with friendly messages
+    switch (error.code) {
+    case 'EACCES':
+        // console.error(bind + ' requires elevated privileges');
+        process.exit(1);
+        break;
+    case 'EADDRINUSE':
+        // console.error(bind + ' is already in use');
+        process.exit(1);
+        break;
+    default:
+        throw error;
+    }
+}
+
+/**
+ * Event listener for HTTP server "listening" event.
+ */
+
+function onListening() {
+    let addr = server.address();
+    let bind = typeof addr === 'string'
+        ? 'pipe ' + addr
+        : 'port ' + addr.port;
+    debug('Listening on ' + bind);
+}
+
+

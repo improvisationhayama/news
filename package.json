@@ -1,0 +1,49 @@
+{
+  "name": "demo",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node ./bin/www",
+    "start:dev": "nodemon ./bin/wwww",
+    "test": "mocha",
+    "lint": "./node_modules/.bin/eslint . --fix"
+  },
+  "dependencies": {
+    "@hapi/joi": "^15.0.3",
+    "casbin": "^3.0.3",
+    "cookie-parser": "~1.4.3",
+    "cors": "^2.8.5",
+    "debug": "~2.6.9",
+    "dotenv": "^8.0.0",
+    "expect.js": "^0.3.1",
+    "express": "~4.16.0",
+    "helmet": "^3.18.0",
+    "http-errors": "~1.6.2",
+    "jsonwebtoken": "^8.5.1",
+    "lodash": "^4.17.15",
+    "moment": "^2.24.0",
+    "morgan": "~1.9.0",
+    "mysql2": "^1.6.5",
+    "node-polyglot": "^2.3.1",
+    "randomstring": "^1.1.5",
+    "request": "^2.88.0",
+    "request-promise": "^4.2.4",
+    "rotating-file-stream": "^1.4.2",
+    "sequelize": "^5.12.3",
+    "winston": "^3.2.1"
+  },
+  "devDependencies": {
+    "chai": "^4.2.0",
+    "eslint": "^5.16.0",
+    "husky": "^2.4.1",
+    "mocha": "^5.2.0",
+    "nodemon": "^1.19.1",
+    "sequelize-mock": "^0.10.2",
+    "should": "^13.2.3",
+    "supertest": "^3.4.2"
+  },
+  "husky": {
+    "pre-commit": "./node_modules/.bin/eslint . --fix",
+    "pre-push": "./node_modules/.bin/eslint . --fix"
+  }
+}
